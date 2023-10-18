@@ -1,0 +1,68 @@
+---
+title: 'Tidal Prism - Yucatán'
+author: 'Javier Patrón'
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+Load the libraries
+
+```{r}
+library(tidyverse)
+library(janitor)
+library(lubridate)
+```
+
+# Read the data
+```{r}
+tides_sisal_oct <- read_csv("tides-oct-2023.csv") |> 
+  clean_names()
+
+# Rename the column
+colnames(tides_sisal_oct) <- c("record_date", "forecast", "radar")
+```
+
+```{r}
+# Calculate metrics for radar
+metrics_radar <- tides_sisal_oct %>% 
+  summarise(
+    tidal_datum = c("MHHW", "MHW", "MSL", "MLW", "MLLW"),
+    radar_value_m = c(
+      mean(radar[radar > quantile(radar, 0.9, na.rm = TRUE)], na.rm = TRUE),
+      mean(radar[radar > quantile(radar, 0.5, na.rm = TRUE)], na.rm = TRUE),
+      mean(radar, na.rm = TRUE),
+      mean(radar[radar < quantile(radar, 0.5, na.rm = TRUE)], na.rm = TRUE),
+      mean(radar[radar < quantile(radar, 0.1, na.rm = TRUE)], na.rm = TRUE)
+    )
+  )
+
+# Calculate metrics for forecast
+metrics_forecast <- tides_sisal_oct %>% 
+  summarise(
+    tidal_datum = c("MHHW", "MHW", "MSL", "MLW", "MLLW"),
+    forecast_value_m = c(
+      mean(forecast[forecast > quantile(forecast, 0.9, na.rm = TRUE)], na.rm = TRUE),
+      mean(forecast[forecast > quantile(forecast, 0.5, na.rm = TRUE)], na.rm = TRUE),
+      mean(forecast, na.rm = TRUE),
+      mean(forecast[forecast < quantile(forecast, 0.5, na.rm = TRUE)], na.rm = TRUE),
+      mean(forecast[forecast < quantile(forecast, 0.1, na.rm = TRUE)], na.rm = TRUE)
+    )
+  )
+
+# Combine into one table
+final_metrics <- inner_join(metrics_radar, metrics_forecast, by = "tidal_datum") |> 
+  mutate(
+    description = case_when(
+      tidal_datum == "MHHW" ~ "Mean Higher High Water",
+      tidal_datum == "MHW"  ~ "Mean High Water",
+      tidal_datum == "MSL"  ~ "Mean Sea Level",
+      tidal_datum == "MLW"  ~ "Mean Low Water",
+      tidal_datum == "MLLW" ~ "Mean Lower Low Water",
+      TRUE                  ~ "Unknown"
+    )
+  ) |> 
+  relocate(description, .after = tidal_datum)
+
+
+```
+
